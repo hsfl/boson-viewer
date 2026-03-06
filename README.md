@@ -4,6 +4,7 @@ Cross-platform terminal-based tool for the FLIR Boson 320+ thermal camera. Suppo
 
 ## Files
 - `boson_stream.py` — CLI tool for camera streaming and recording
+- `boson_gui.py` — GUI application for camera streaming and recording
 - `requirements.txt` — Python dependencies
 
 ## Installation
@@ -27,6 +28,35 @@ source .venv/bin/activate
 ```bash
 pip install -r requirements.txt
 ```
+
+## GUI Application (`boson_gui.py`)
+
+A point-and-click interface for the Boson camera. On launch it prompts you to select a camera and a save folder, then opens a window with a live stream, record button, and data viewer.
+
+### Running the GUI directly
+```bash
+python boson_gui.py
+```
+
+Data is saved to `./data/` (relative to the script) when run this way.
+
+### Building an executable
+
+The GUI can be compiled into a standalone `Boson Viewer.app` that lives on your Desktop and requires no terminal to use. Run this once from the project folder with your virtual environment activated:
+
+```bash
+# on Linux/macOS
+pyinstaller -y --distpath ~/Desktop boson_gui.spec
+
+# on Windows
+pyinstaller -y --distpath %USERPROFILE%\Desktop boson_gui.spec
+```
+
+This places `Boson Viewer.app` on your Desktop. When launched as an app, data is saved to `~/Boson Viewer/data/` by default (the folder is created automatically).
+
+> **First launch on macOS:** if you see "unidentified developer", right-click the app → Open → Open to allow it once.
+
+To rebuild after editing `boson_gui.py`, run the same `pyinstaller` command again (the old `.app` will be replaced).
 
 ## Usage
 1. run `source .venv/bin/activate` if not already activated.
