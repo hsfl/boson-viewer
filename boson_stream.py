@@ -5,6 +5,8 @@ import datetime
 import os
 import sys
 import platform
+import matplotlib.pyplot as plt
+from pathlib import Path
 
 
 def get_capture_backend():
@@ -98,6 +100,85 @@ def parse_record_args(has_filename):
                 print('Invalid camera index. Using default (0).')
             i += 1
     return camera_index, num_frames
+
+# Records 1 frame and saves raw data to CSV file
+def record_frame(manual_filename, has_filename=True):
+    camera_index, num_frames = parse_record_args(has_filename)
+
+    cap = cv2.VideoCapture(camera_index, get_capture_backend())
+    if not cap.isOpened():
+        print(f'Error: Could not open camera at index {camera_index}.')
+        return
+    base_filename = sanitize_filename(manual_filename)
+    timestamp = get_timestamp()
+    file_prefix = f'{base_filename}_{timestamp}' if has_filename else timestamp
+    out_folder = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data', base_filename)
+    os.makedirs(out_folder, exist_ok=True)
+
+    # Raw data storage
+    raw_data = []
+
+    ret, frame = cap.read()
+    if not ret:
+        print('Error: Failed to read frame.')
+
+    # Store raw data (convert to 16-bit if needed)
+    if frame.dtype != np.uint16:
+        frame16 = np.left_shift(frame.astype(np.uint16), 8)
+    else:
+        frame16 = frame
+    raw_data.append(frame16)
+
+    cap.release()
+
+    # Save raw data as .npy file
+    npy_filename = f'{file_prefix}_raw.npy'
+    npy_filepath = os.path.join(out_folder, npy_filename)
+    raw_array = np.array(raw_data)
+    np.save(npy_filepath, raw_array)
+
+    # Save raw data as CSV (first frame only for demo, can be expanded)
+    csv_filename = f'{file_prefix}_raw_frame0.csv'
+    csv_filepath = os.path.join(out_folder, csv_filename)
+    # If frames are multi-channel, flatten to 2D for CSV
+    if raw_array.ndim == 4:
+        # Save only first frame, all channels
+        np.savetxt(csv_filepath, raw_array[0].reshape(-1, raw_array.shape[-1]), delimiter=',', fmt='%d')
+    else:
+        np.savetxt(csv_filepath, raw_array[0], delimiter=',', fmt='%d')
+
+    print(f'''Frame capture completed. 
+        Raw data saved to: {npy_filepath}
+        CSV saved to: {csv_filepath}''')
+    
+def display_frame():
+    folder = Path(input("Enter path to csv files: "))
+    files = [f for f in folder.iterdir() if f.is_file() and f.suffix == '.csv']
+
+    for index, file in enumerate(files):
+        # print(file.name)  # Prints just the filename
+        #print(file)       # Prints the full path
+        print(f' File index {index}: {file.name}')
+    
+    file_index = int(input("Enter index number of file: "))
+
+    file_name = files[file_index].name
+    path = os.path.join(folder, file_name)
+
+    raw = np.loadtxt(path, delimiter=",")
+
+    print("Raw shape:", raw.shape)  # should be (81920, 3)
+
+    height, width = 512, 640
+    img = raw.reshape(height, width, 3)  # BGR
+
+    # Option B: show one channel as grayscale intensity (often more useful)
+    plt.imshow(img[:, :, 0], cmap='inferno')
+    plt.colorbar(label="Channel 0 Intensity")
+
+    plt.axis('off')
+    plt.tight_layout()
+    plt.show()
 
 def record_stream(manual_filename, has_filename=True):
     camera_index, num_frames = parse_record_args(has_filename)
@@ -301,6 +382,12 @@ def main():
         has_filename = len(sys.argv) > 2 and sys.argv[2] not in ('-n',) and not sys.argv[2].isdigit()
         manual_filename = sys.argv[2] if has_filename else get_timestamp()
         record_stream(manual_filename, has_filename)
+    elif cmd == 'record_frame':
+        has_filename = len(sys.argv) > 2 and sys.argv[2] not in ('-n',) and not sys.argv[2].isdigit()
+        manual_filename = sys.argv[2] if has_filename else get_timestamp()
+        record_frame(manual_filename, has_filename)
+    elif cmd == 'display_frame':
+        display_frame()
     else:
         print('Unknown command.')
         show_help()
